@@ -1,0 +1,76 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <pthread.h>
+#include <semaphore.h>
+
+pthread_mutex_t m;
+sem_t items; //num of items in queue
+sem_t spaces; //num of free spaces in queue
+
+typedef struct Node {
+    void* data;
+    struct Node* next;
+} Node;
+
+typedef struct {
+    Node* front;
+    Node* back;
+} Queue;
+
+void initialize(Queue* q, int max_q_size) {
+    sem_init(&items, 0, 0);
+    sem_init(&spaces, 0, max_q_size);
+    pthread_mutex_init(&m, NULL);
+
+    q->front = q->back = NULL;
+}
+
+void enqueue(Queue* q, void* data) {
+    sem_wait(&spaces);
+    pthread_mutex_lock(&m);
+
+    Node* new_node = malloc(sizeof(Node));
+    new_node->data = data;
+    new_node->next = NULL;
+
+    if (q->back == NULL) {
+        q->front = q->back = new_node;
+    } else {
+        q->back->next = new_node;
+        q->back = new_node;
+    }
+
+    pthread_mutex_unlock(&m);
+    sem_post(&items);
+}
+
+void* dequeue(Queue* q) {
+    sem_wait(&items);
+    pthread_mutex_lock(&m);
+
+    Node* temp = q->front;
+    void* data = temp->data;
+
+    q->front = temp->next;
+    if (q->front == NULL)
+        q->back = NULL;
+
+    free(temp);
+    pthread_mutex_unlock(&m);
+    sem_post(&spaces);
+    return data;
+}
+
+void freeQueue(Queue *q) {
+    pthread_mutex_lock(&m);
+    while (q->front != NULL) {
+        Node *temp = q->front;
+        q->front = q->front->next;
+        free(temp);
+    }
+    q->back = NULL;
+    pthread_mutex_unlock(&m);
+}
+

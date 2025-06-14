@@ -2,6 +2,14 @@
 #include "request.h"
 #include "log.h"
 
+#include "queue.c"
+
+#include <pthread.h>
+#include <semaphore.h>
+
+#define NUM_OF_WORKERS 10
+#define MAX_QUEUE_SIZE 100
+
 //
 // server.c: A very, very simple web server
 //
@@ -21,35 +29,22 @@ void getargs(int *port, int argc, char *argv[])
     }
     *port = atoi(argv[1]);
 }
-// TODO: HW3 — Initialize thread pool and request queue
-// This server currently handles all requests in the main thread.
-// You must implement a thread pool (fixed number of worker threads)
-// that process requests from a synchronized queue.
 
-int main(int argc, char *argv[])
-{
-    // Create the global server log
-    server_log log = create_log();
+typedef struct {
+    Queue* queue;
+    server_log log;
+} WorkerArgs;
 
-    int listenfd, connfd, port, clientlen;
-    struct sockaddr_in clientaddr;
+void* handle_requests(void* arg) {
+    WorkerArgs* args = (WorkerArgs*)arg;
+    Queue* requests_queue = args->queue;
+    server_log log = args->log;
 
-    getargs(&port, argc, argv);
+    while(1) {
+        int* connfd_ptr = (int*)dequeue(requests_queue); //workers will wait here when queue is empty
 
-
-
-    listenfd = Open_listenfd(port);
-    while (1) {
-        clientlen = sizeof(clientaddr);
-        connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
-
-        // TODO: HW3 — Record the request arrival time here
-
-        // DEMO PURPOSE ONLY:
-        // This is a dummy request handler that immediately processes
-        // the request in the main thread without concurrency.
-        // Replace this with logic to enqueue the connection and let
-        // a worker thread process it from the queue.
+        int connfd = *connfd_ptr;
+        free(connfd_ptr);
 
         threads_stats t = malloc(sizeof(struct Threads_stats));
         t->id = 0;             // Thread ID (placeholder)
@@ -68,9 +63,54 @@ int main(int argc, char *argv[])
         free(t); // Cleanup
         Close(connfd); // Close the connection
     }
+}
+
+void initialize_workers_threads(pthread_t arr[NUM_OF_WORKERS], Queue* q, server_log log) {
+    for (int i = 0; i < NUM_OF_WORKERS; i++) {
+        WorkerArgs* args = malloc(sizeof(WorkerArgs));
+        args->queue = q;
+        args->log = log;
+        pthread_create(&arr[i], NULL, handle_requests, args);
+    }
+}
+
+void clear_worker_threads(pthread_t arr[NUM_OF_WORKERS]) {
+    for(int i = 0; i < NUM_OF_WORKERS; i++) {
+        pthread_cancel(arr[i]);
+    }
+}
+
+int main(int argc, char *argv[])
+{
+    // Create the global server log
+    server_log log = create_log();
+
+    int listenfd, connfd, port, clientlen;
+    struct sockaddr_in clientaddr;
+
+    getargs(&port, argc, argv);
+
+    Queue requests_queue;
+    initialize(&requests_queue, MAX_QUEUE_SIZE);
+
+    pthread_t worker_threads[NUM_OF_WORKERS];
+    initialize_workers_threads(worker_threads, &requests_queue, log);
+
+    listenfd = Open_listenfd(port);
+    while (1) {
+        clientlen = sizeof(clientaddr);
+        connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
+
+        int *connfd_ptr = malloc(sizeof(int));
+        *connfd_ptr = connfd;  //pass pointer to connection fd
+
+        enqueue(&requests_queue, connfd_ptr); //will wait here if queue is full
+
+        // TODO: HW3 — Record the request arrival time here
+    }
 
     // Clean up the server log before exiting
     destroy_log(log);
-
-    // TODO: HW3 — Add cleanup code for thread pool and queue
+    clear_worker_threads(worker_threads);
+    freeQueue(&requests_queue);
 }
