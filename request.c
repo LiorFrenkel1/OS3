@@ -124,6 +124,9 @@ void requestGetFiletype(char *filename, char *filetype)
 
 void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
+    //update the thread stats
+    t_stats->dynm_req++;
+
 	char buf[MAXLINE], *emptylist[] = {NULL};
 
 	// The server does only a little bit of the header.
@@ -142,11 +145,15 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
      	 Execve(filename, emptylist, environ);
    	}
   	WaitPid(pid, NULL, WUNTRACED);
+
 }
 
 
 void requestServeStatic(int fd, char *filename, int filesize, struct timeval arrival, struct timeval dispatch, threads_stats t_stats)
 {
+    //update the thread stats
+    t_stats->stat_req++;
+
 	int srcfd;
 	char *srcp, filetype[MAXLINE], buf[MAXBUF];
 
@@ -170,10 +177,13 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 	//  Writes out to the client socket the memory-mapped file
 	Rio_writen(fd, srcp, filesize);
 	Munmap(srcp, filesize);
+
 }
 
 void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log log)
 {
+    //update the thread stats
+    t_stats->post_req++;
     char header[MAXBUF], *body = NULL;
     int body_len = get_log(log, &body);
     // put together response
@@ -185,12 +195,14 @@ void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, 
     Rio_writen(fd, header, header_len);
     Rio_writen(fd, body, body_len);
     free(body);
+
 }
 
 // handle a request
 void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, threads_stats t_stats, server_log log)
 {
-    // TODO:  should update static request stats
+    t_stats->total_req++;
+
     int is_static;
     struct stat sbuf;
     char buf[MAXLINE], method[MAXLINE], uri[MAXLINE], version[MAXLINE];
@@ -200,6 +212,7 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
     Rio_readinitb(&rio, fd);
     Rio_readlineb(&rio, buf, MAXLINE);
     sscanf(buf, "%s %s %s", method, uri, version);
+
 
     if (!strcasecmp(method, "GET")) {
         requestReadhdrs(&rio);

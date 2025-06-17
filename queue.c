@@ -83,9 +83,14 @@ void freeQueue(Queue *q) {
     while (q->front != NULL) {
         Node *temp = q->front;
         q->front = q->front->next;
+        free(temp->data);
         free(temp);
     }
     q->back = NULL;
     pthread_mutex_unlock(&m);
+
+    pthread_mutex_destroy(&m);
+    sem_destroy(&items);
+    sem_destroy(&spaces);
 }
 

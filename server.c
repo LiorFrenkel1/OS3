@@ -34,21 +34,19 @@ typedef struct {
     Queue* queue;
     server_log log;
     int id;
-    int count;
-    int static_count;
-    int dynamic_count;
-    int post_count;
 } WorkerArgs;
 
 void* handle_requests(void* arg) {
     WorkerArgs* args = (WorkerArgs*)arg;
     Queue* requests_queue = args->queue;
     server_log log = args->log;
+    int id = args->id;
     threads_stats t = malloc(sizeof(struct Threads_stats));
-    t->id = 0;             // Thread ID (placeholder)
+    t->id = id;             // Thread ID (placeholder)
     t->stat_req = 0;       // Static request count
     t->dynm_req = 0;       // Dynamic request count
     t->total_req = 0;      // Total request count
+    t->post_req = 0;
 
     while(1) {
         requestEntry* reqEnt = (requestEntry*)dequeue(requests_queue); //workers will wait here when queue is empty
@@ -57,10 +55,12 @@ void* handle_requests(void* arg) {
 
         requestHandle(connfd, reqEnt->arrival, reqEnt->dispatch, t, log);
 
-        free(t); // Cleanup
         free(reqEnt);
         Close(connfd); // Close the connection
     }
+    free(t); // Cleanup
+    free(args);
+    return NULL;
 }
 
 void initialize_workers_threads(pthread_t arr[NUM_OF_WORKERS], Queue* q, server_log log) {
