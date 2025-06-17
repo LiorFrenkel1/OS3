@@ -19,6 +19,11 @@ typedef struct {
     Node* back;
 } Queue;
 
+typedef struct {
+    struct timeval arrival, dispatch;
+    int connfd;
+} requestEntry;
+
 void initialize(Queue* q, int max_q_size) {
     sem_init(&items, 0, 0);
     sem_init(&spaces, 0, max_q_size);
@@ -42,6 +47,11 @@ void enqueue(Queue* q, void* data) {
         q->back = new_node;
     }
 
+    requestEntry* reqEnt = (requestEntry*)data; //update arrival time
+    struct timeval arrival;
+    gettimeofday(&arrival, NULL);
+    reqEnt->arrival = arrival;
+
     pthread_mutex_unlock(&m);
     sem_post(&items);
 }
@@ -52,6 +62,11 @@ void* dequeue(Queue* q) {
 
     Node* temp = q->front;
     void* data = temp->data;
+
+    requestEntry* reqEnt = (requestEntry*)data; //update dispatch time
+    struct timeval dispatch;
+    gettimeofday(&dispatch, NULL);
+    reqEnt->dispatch = dispatch;
 
     q->front = temp->next;
     if (q->front == NULL)

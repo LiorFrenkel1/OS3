@@ -2,12 +2,12 @@
 #include "request.h"
 #include "log.h"
 
-#include "queue.c"
+#include "queue.c" //also has requestEntry
 
 #include <pthread.h>
 #include <semaphore.h>
 
-#define NUM_OF_WORKERS 10
+#define NUM_OF_WORKERS 10 //TODO CHANGE IF NEEDED
 #define MAX_QUEUE_SIZE 100
 
 //
@@ -33,34 +33,32 @@ void getargs(int *port, int argc, char *argv[])
 typedef struct {
     Queue* queue;
     server_log log;
+    int id;
+    int count;
+    int static_count;
+    int dynamic_count;
+    int post_count;
 } WorkerArgs;
 
 void* handle_requests(void* arg) {
     WorkerArgs* args = (WorkerArgs*)arg;
     Queue* requests_queue = args->queue;
     server_log log = args->log;
+    threads_stats t = malloc(sizeof(struct Threads_stats));
+    t->id = 0;             // Thread ID (placeholder)
+    t->stat_req = 0;       // Static request count
+    t->dynm_req = 0;       // Dynamic request count
+    t->total_req = 0;      // Total request count
 
     while(1) {
-        int* connfd_ptr = (int*)dequeue(requests_queue); //workers will wait here when queue is empty
+        requestEntry* reqEnt = (requestEntry*)dequeue(requests_queue); //workers will wait here when queue is empty
 
-        int connfd = *connfd_ptr;
-        free(connfd_ptr);
+        int connfd = reqEnt->connfd;
 
-        threads_stats t = malloc(sizeof(struct Threads_stats));
-        t->id = 0;             // Thread ID (placeholder)
-        t->stat_req = 0;       // Static request count
-        t->dynm_req = 0;       // Dynamic request count
-        t->total_req = 0;      // Total request count
-
-        struct timeval arrival, dispatch;
-        arrival.tv_sec = 0; arrival.tv_usec = 0;   // DEMO: dummy timestamps
-        dispatch.tv_sec = 0; dispatch.tv_usec = 0; // DEMO: dummy timestamps
-        // gettimeofday(&arrival, NULL);
-
-        // Call the request handler (immediate in main thread — DEMO ONLY)
-        requestHandle(connfd, arrival, dispatch, t, log);
+        requestHandle(connfd, reqEnt->arrival, reqEnt->dispatch, t, log);
 
         free(t); // Cleanup
+        free(reqEnt);
         Close(connfd); // Close the connection
     }
 }
@@ -70,7 +68,8 @@ void initialize_workers_threads(pthread_t arr[NUM_OF_WORKERS], Queue* q, server_
         WorkerArgs* args = malloc(sizeof(WorkerArgs));
         args->queue = q;
         args->log = log;
-        pthread_create(&arr[i], NULL, handle_requests, args);
+        args->id = i+1;
+        pthread_create(&arr[i],NULL, handle_requests, args);
     }
 }
 
@@ -101,10 +100,10 @@ int main(int argc, char *argv[])
         clientlen = sizeof(clientaddr);
         connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
 
-        int *connfd_ptr = malloc(sizeof(int));
-        *connfd_ptr = connfd;  //pass pointer to connection fd
+        requestEntry* reqEnt = malloc(sizeof(requestEntry ));
+        reqEnt->connfd = connfd;
 
-        enqueue(&requests_queue, connfd_ptr); //will wait here if queue is full
+        enqueue(&requests_queue, reqEnt); //will wait here if queue is full
 
         // TODO: HW3 — Record the request arrival time here
     }
