@@ -235,6 +235,10 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 
             requestServeStatic(fd, filename, sbuf.st_size, arrival, dispatch, t_stats);
 
+            char statBuffer[MAXBUF];
+            int statLength = append_stats(statBuffer, t_stats, arrival, dispatch);
+            add_to_log(log, statBuffer, statLength);
+
         } else {
             if (!(S_ISREG(sbuf.st_mode)) || !(S_IXUSR & sbuf.st_mode)) {
                 requestError(fd, filename, "403", "Forbidden",
@@ -244,9 +248,11 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
             }
 
             requestServeDynamic(fd, filename, cgiargs, arrival, dispatch, t_stats);
-        }
 
-        // TODO: add log entry using add_to_log(server_log log, const char* data, int data_len);
+            char statBuffer[MAXBUF];
+            int statLength = append_stats(statBuffer, t_stats, arrival, dispatch);
+            add_to_log(log, statBuffer, statLength);
+        }
 
     } else if (!strcasecmp(method, "POST")) {
         requestServePost(fd, arrival, dispatch, t_stats, log);
