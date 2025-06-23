@@ -11,6 +11,7 @@ typedef struct LogDataNode {
 // Opaque struct definition
 struct Server_Log {
     LogDataNode* head;
+    LogDataNode* tail;
     int readersInside;
     int writersInside;
     int writersWaiting;
@@ -23,6 +24,7 @@ struct Server_Log {
 server_log create_log() {
     server_log serverLog = (server_log)malloc(sizeof(struct Server_Log));
     serverLog->head = NULL;
+    serverLog->tail = NULL;
     serverLog->readersInside = 0;
     serverLog->writersInside = 0;
     serverLog->writersWaiting = 0;
@@ -51,15 +53,14 @@ void destroy_log(server_log log) {
     free(log);
 }
 
-// Returns dummy log content as string (stub)
+// Return the full contents of the log as a dynamically allocated string
 int get_log(server_log log, char** dst) {
-    // TODO: Return the full contents of the log as a dynamically allocated string
-    // This function should handle concurrent access
     pthread_mutex_lock(&log->mutexLock);
     while (log->writersWaiting >= 1 || log->writersInside >= 1) {
         pthread_cond_wait(&log->readAllowed, &log->mutexLock);
     }
     log->readersInside++;
+    pthread_mutex_unlock(&log->mutexLock);
 
     int len = 0;
     LogDataNode* current = log->head;
@@ -86,8 +87,37 @@ int get_log(server_log log, char** dst) {
     return len;
 }
 
-// Appends a new entry to the log (no-op stub)
+// Append the provided data to the log
 void add_to_log(server_log log, const char* data, int data_len) {
-    // TODO: Append the provided data to the log
-    // This function should handle concurrent access
+    pthread_mutex_lock(&log->mutexLock);
+    log->writersWaiting++;
+    while (log->writersInside + log->readersInside >= 1) {
+        pthread_cond_wait(&log->writeAllowed, &log->mutexLock);
+    }
+    log->writersWaiting--;
+    log->writersInside++;
+    pthread_mutex_unlock(&log->mutexLock);
+
+    LogDataNode* newData = (LogDataNode*)malloc(sizeof(LogDataNode));
+    newData->logData = (char*)malloc(data_len + 1);
+    for (int i = 0; i < data_len; i++) {
+        newData->logData[i] = data[i];
+    }
+    newData->logData[data_len] = '\0';
+    newData->next = NULL;
+    if (log->head == NULL) {
+        log->head = newData;
+        log->tail = newData;
+    } else {
+        log->tail->next = newData;
+        log->tail = log->tail->next;
+    }
+
+    pthread_mutex_lock(&log->mutexLock);
+    log->writersInside--;
+    if (log->writersInside == 0) {
+        pthread_cond_broadcast(&log->readAllowed);
+        pthread_cond_signal(&log->writeAllowed);
+    }
+    pthread_mutex_unlock(&log->mutexLock);
 }
