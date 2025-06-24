@@ -11,8 +11,9 @@ int append_stats(char* buf, threads_stats t_stats, struct timeval arrival, struc
     offset += sprintf(buf + offset, "Stat-Req-Arrival:: %ld.%06ld\r\n",
                       arrival.tv_sec, arrival.tv_usec);
 
-    offset += sprintf(buf + offset, "Stat-Req-Dispatch:: %ld.%06ld\r\n",
-                      dispatch.tv_sec, dispatch.tv_usec);
+    double dispatch_delay = (dispatch.tv_sec - arrival.tv_sec) +
+                            (dispatch.tv_usec - arrival.tv_usec) / 1000000.0;
+    offset += sprintf(buf + offset, "Stat-Req-Dispatch:: %.6f\r\n", dispatch_delay);
 
     offset += sprintf(buf + offset, "Stat-Thread-Id:: %d\r\n",
                       t_stats->id);
@@ -256,6 +257,10 @@ void requestHandle(int fd, struct timeval arrival, struct timeval dispatch, thre
 
     } else if (!strcasecmp(method, "POST")) {
         requestServePost(fd, arrival, dispatch, t_stats, log);
+
+        char statBuffer[MAXBUF];
+        int statLength = append_stats(statBuffer, t_stats, arrival, dispatch);
+        add_to_log(log, statBuffer, statLength);
 
     } else {
         requestError(fd, method, "501", "Not Implemented",
