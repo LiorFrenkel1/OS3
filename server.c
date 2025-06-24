@@ -7,8 +7,8 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-#define NUM_OF_WORKERS 10 //TODO CHANGE IF NEEDED
-#define MAX_QUEUE_SIZE 100
+//#define NUM_OF_WORKERS 10 //TODO CHANGE IF NEEDED
+//#define MAX_QUEUE_SIZE 100
 
 //
 // server.c: A very, very simple web server
@@ -21,13 +21,20 @@
 //
 
 // Parses command-line arguments
-void getargs(int *port, int argc, char *argv[])
+void getargs(int *port, int *num_threads, int *queue_size, int argc, char *argv[])
 {
-    if (argc < 2) {
-        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
+    if (argc != 4) {
+        fprintf(stderr, "Usage: %s <port> <threads> <queue_size>\n", argv[0]);
         exit(1);
     }
     *port = atoi(argv[1]);
+    *num_threads = atoi(argv[2]);
+    *queue_size = atoi(argv[3]);
+
+    if (*num_threads <= 0 || *queue_size <= 0) {
+        fprintf(stderr, "threads and queue_size must be positive integers.\n");
+        exit(1);
+    }
 }
 
 typedef struct {
@@ -63,8 +70,8 @@ void* handle_requests(void* arg) {
     return NULL;
 }
 
-void initialize_workers_threads(pthread_t arr[NUM_OF_WORKERS], Queue* q, server_log log) {
-    for (int i = 0; i < NUM_OF_WORKERS; i++) {
+void initialize_workers_threads(pthread_t* arr, Queue* q, server_log log, int num_threads) {
+    for (int i = 0; i < num_threads; i++) {
         WorkerArgs* args = malloc(sizeof(WorkerArgs));
         args->queue = q;
         args->log = log;
@@ -73,8 +80,8 @@ void initialize_workers_threads(pthread_t arr[NUM_OF_WORKERS], Queue* q, server_
     }
 }
 
-void clear_worker_threads(pthread_t arr[NUM_OF_WORKERS]) {
-    for(int i = 0; i < NUM_OF_WORKERS; i++) {
+void clear_worker_threads(pthread_t* arr, int num_threads) {
+    for(int i = 0; i < num_threads; i++) {
         pthread_cancel(arr[i]);
     }
 }
@@ -87,13 +94,14 @@ int main(int argc, char *argv[])
     int listenfd, connfd, port, clientlen;
     struct sockaddr_in clientaddr;
 
-    getargs(&port, argc, argv);
+    int num_threads, queue_size;
+    getargs(&port, &num_threads, &queue_size, argc, argv);
 
     Queue requests_queue;
-    initialize(&requests_queue, MAX_QUEUE_SIZE);
+    initialize(&requests_queue, queue_size);
 
-    pthread_t worker_threads[NUM_OF_WORKERS];
-    initialize_workers_threads(worker_threads, &requests_queue, log);
+    pthread_t worker_threads[num_threads];
+    initialize_workers_threads(worker_threads, &requests_queue, log, num_threads);
 
     listenfd = Open_listenfd(port);
     while (1) {
@@ -110,6 +118,6 @@ int main(int argc, char *argv[])
 
     // Clean up the server log before exiting
     destroy_log(log);
-    clear_worker_threads(worker_threads);
+    clear_worker_threads(worker_threads, num_threads);
     freeQueue(&requests_queue);
 }
