@@ -26,7 +26,7 @@ int append_stats(char* buf, threads_stats t_stats, struct timeval arrival, struc
 
     offset += sprintf(buf + offset, "Stat-Thread-Dynamic:: %d\r\n",
                       t_stats->dynm_req);
-    offset += sprintf(buf + offset, "Stat-Thread-Post:: %d\r\n\r\n",
+    offset += sprintf(buf + offset, "Stat-Thread-Post:: %d\r\n",
                       t_stats->post_req);
     return offset;
 }
@@ -55,8 +55,9 @@ void requestError(int fd, char *cause, char *errnum, char *shortmsg, char *longm
 	sprintf(buf, "Content-Length: %lu\r\n", strlen(body));
 
     int buf_len = append_stats(buf, t_stats, arrival, dispatch);
+    buf_len += sprintf(buf + buf_len, "\r\n");
 
-	Rio_writen(fd, buf, buf_len);
+    Rio_writen(fd, buf, buf_len);
 	printf("%s", buf);
 	Rio_writen(fd, body, strlen(body));
 	printf("%s", body);
@@ -173,6 +174,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 	sprintf(buf, "%sContent-Length: %d\r\n", buf, filesize);
 	sprintf(buf, "%sContent-Type: %s\r\n", buf, filetype);
     int buf_len = append_stats(buf, t_stats, arrival, dispatch);
+    buf_len += sprintf(buf + buf_len, "\r\n");
     Rio_writen(fd, buf, buf_len);
 
 	//  Writes out to the client socket the memory-mapped file
@@ -193,6 +195,7 @@ void requestServePost(int fd,  struct timeval arrival, struct timeval dispatch, 
     sprintf(header, "%sContent-Length: %d\r\n", header, body_len);
     sprintf(header, "%sContent-Type: %s\r\n", header, "text/plain");
     int header_len = append_stats(header, t_stats, arrival, dispatch);
+    header_len += sprintf(header + header_len, "\r\n");
     Rio_writen(fd, header, header_len);
     Rio_writen(fd, body, body_len);
     free(body);
