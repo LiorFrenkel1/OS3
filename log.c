@@ -65,18 +65,30 @@ int get_log(server_log log, char** dst) {
     pthread_mutex_unlock(&log->mutexLock);
 
     int len = 0;
+    int nodeCount = 0;
     LogDataNode* current = log->head;
     while (current != NULL) {
         len += (int)strlen(current->logData);
+        nodeCount++;
         current = current->next;
     }
+    // Add space for newlines between entries (nodeCount - 1 newlines)
+    if (nodeCount > 1) {
+        len += nodeCount - 1;
+    }
+
     *dst = (char*)malloc(len + 1); // Allocate for caller
-    *dst[0] = '\0';
+    (*dst)[0] = '\0';  // Fixed: was *dst[0] = '\0' which is incorrect
     if (*dst != NULL) {
         current = log->head;
+        int isFirst = 1;
         while (current != NULL) {
+            if (!isFirst) {
+                strcat(*dst, "\n");  // Add newline before each entry except the first
+            }
             strcat(*dst, current->logData);
             current = current->next;
+            isFirst = 0;
         }
     }
 
@@ -98,9 +110,11 @@ void add_to_log(server_log log, const char* data, int data_len) {
     }
     log->writersWaiting--;
     log->writersInside++;
-    usleep(200000);
-    pthread_mutex_unlock(&log->mutexLock);
 
+    // Keep the sleep inside the critical section for proper synchronization
+    usleep(200000);
+
+    // Create and add the log entry while still in critical section
     LogDataNode* newData = (LogDataNode*)malloc(sizeof(LogDataNode));
     newData->logData = (char*)malloc(data_len + 1);
     for (int i = 0; i < data_len; i++) {
@@ -108,6 +122,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     }
     newData->logData[data_len] = '\0';
     newData->next = NULL;
+
     if (log->head == NULL) {
         log->head = newData;
         log->tail = newData;
@@ -116,7 +131,6 @@ void add_to_log(server_log log, const char* data, int data_len) {
         log->tail = log->tail->next;
     }
 
-    pthread_mutex_lock(&log->mutexLock);
     log->writersInside--;
     if (log->writersInside == 0) {
         pthread_cond_broadcast(&log->readAllowed);
