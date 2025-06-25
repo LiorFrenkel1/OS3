@@ -3,6 +3,8 @@
 #include <pthread.h>
 #include "log.h"
 
+#include <unistd.h> //todo delete
+
 typedef struct LogDataNode {
     char* logData;
     struct LogDataNode* next;
@@ -96,6 +98,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     }
     log->writersWaiting--;
     log->writersInside++;
+    usleep(200000);
     pthread_mutex_unlock(&log->mutexLock);
 
     LogDataNode* newData = (LogDataNode*)malloc(sizeof(LogDataNode));
