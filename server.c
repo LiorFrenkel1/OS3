@@ -21,6 +21,7 @@
 //
 
 // Parses command-line arguments
+Queue requests_queue;
 void getargs(int *port, int *num_threads, int *queue_size, int argc, char *argv[])
 {
     if (argc != 4) {
@@ -45,7 +46,6 @@ typedef struct {
 
 void* handle_requests(void* arg) {
     WorkerArgs* args = (WorkerArgs*)arg;
-    Queue* requests_queue = args->queue;
     server_log log = args->log;
     int id = args->id;
     threads_stats t = malloc(sizeof(struct Threads_stats));
@@ -56,7 +56,7 @@ void* handle_requests(void* arg) {
     t->post_req = 0;
 
     while(1) {
-        requestEntry* reqEnt = (requestEntry*)dequeue(requests_queue); //workers will wait here when queue is empty
+        requestEntry* reqEnt = (requestEntry*)dequeue(&requests_queue); //workers will wait here when queue is empty
 
         int connfd = reqEnt->connfd;
         // Dispatch time is already calculated in dequeue() when worker picks up the request
@@ -74,10 +74,9 @@ void* handle_requests(void* arg) {
     return NULL;
 }
 
-void initialize_workers_threads(pthread_t* arr, Queue* q, server_log log, int num_threads) {
+void initialize_workers_threads(pthread_t* arr,server_log log, int num_threads) {
     for (int i = 0; i < num_threads; i++) {
         WorkerArgs* args = malloc(sizeof(WorkerArgs));
-        args->queue = q;
         args->log = log;
         args->id = i+1;
         pthread_create(&arr[i],NULL, handle_requests, args);
@@ -101,11 +100,10 @@ int main(int argc, char *argv[])
     int num_threads, queue_size;
     getargs(&port, &num_threads, &queue_size, argc, argv);
 
-    Queue requests_queue;
     initialize(&requests_queue, queue_size);
 
     pthread_t worker_threads[num_threads];
-    initialize_workers_threads(worker_threads, &requests_queue, log, num_threads);
+    initialize_workers_threads(worker_threads, log, num_threads);
 
     listenfd = Open_listenfd(port);
     while (1) {
