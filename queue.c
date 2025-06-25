@@ -63,9 +63,11 @@ void* dequeue(Queue* q) {
     Node* temp = q->front;
     void* data = temp->data;
 
-    requestEntry* reqEnt = (requestEntry*)data; //update dispatch time
-    struct timeval dispatch;
-    gettimeofday(&dispatch, NULL);
+    requestEntry* reqEnt = (requestEntry*)data;
+    // Calculate dispatch time: time from arrival to when worker picks up the request (dequeue)
+    struct timeval current, dispatch;
+    gettimeofday(&current, NULL);
+    timersub(&current, &reqEnt->arrival, &dispatch);
     reqEnt->dispatch = dispatch;
 
     q->front = temp->next;
@@ -74,8 +76,13 @@ void* dequeue(Queue* q) {
 
     free(temp);
     pthread_mutex_unlock(&m);
-    sem_post(&spaces);
+    // DON'T post to spaces here - wait until request is completed
     return data;
+}
+
+// New function to signal request completion
+void request_completed() {
+    sem_post(&spaces);
 }
 
 void freeQueue(Queue *q) {
@@ -93,4 +100,3 @@ void freeQueue(Queue *q) {
     sem_destroy(&items);
     sem_destroy(&spaces);
 }
-

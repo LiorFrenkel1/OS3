@@ -59,11 +59,15 @@ void* handle_requests(void* arg) {
         requestEntry* reqEnt = (requestEntry*)dequeue(requests_queue); //workers will wait here when queue is empty
 
         int connfd = reqEnt->connfd;
+        // Dispatch time is already calculated in dequeue() when worker picks up the request
 
         requestHandle(connfd, reqEnt->arrival, reqEnt->dispatch, t, log);
 
         free(reqEnt);
         Close(connfd); // Close the connection
+
+        // Signal that the request is completely handled and a space is now available
+        request_completed();
     }
     free(t); // Cleanup
     free(args);
@@ -112,8 +116,6 @@ int main(int argc, char *argv[])
         reqEnt->connfd = connfd;
 
         enqueue(&requests_queue, reqEnt); //will wait here if queue is full
-
-        // TODO: HW3 — Record the request arrival time here
     }
 
     // Clean up the server log before exiting
