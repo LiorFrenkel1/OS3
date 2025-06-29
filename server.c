@@ -7,9 +7,6 @@
 #include <pthread.h>
 #include <semaphore.h>
 
-//#define NUM_OF_WORKERS 10 //TODO CHANGE IF NEEDED
-//#define MAX_QUEUE_SIZE 100
-
 //
 // server.c: A very, very simple web server
 //
@@ -59,14 +56,14 @@ void* handle_requests(void* arg) {
         requestEntry* reqEnt = (requestEntry*)dequeue(&requests_queue); //workers will wait here when queue is empty
 
         int connfd = reqEnt->connfd;
-        // Dispatch time is already calculated in dequeue() when worker picks up the request
+        //dispatch time is already calculated in dequeue() when worker picks up the request
 
         requestHandle(connfd, reqEnt->arrival, reqEnt->dispatch, t, log);
 
         free(reqEnt);
-        Close(connfd); // Close the connection
+        Close(connfd);
 
-        // Signal that the request is completely handled and a space is now available
+        //signal that the request is completely handled and a space is now available
         request_completed();
     }
     free(t); // Cleanup

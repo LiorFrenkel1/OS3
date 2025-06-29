@@ -3,8 +3,6 @@
 #include <pthread.h>
 #include "log.h"
 
-#include <unistd.h> //todo delete
-
 typedef struct LogDataNode {
     char* logData;
     struct LogDataNode* next;
@@ -72,13 +70,13 @@ int get_log(server_log log, char** dst) {
         nodeCount++;
         current = current->next;
     }
-    // Add space for newlines between entries (nodeCount - 1 newlines)
+    //Add space for newlines between entries (nodeCount - 1 newlines)
     if (nodeCount > 1) {
         len += nodeCount - 1;
     }
 
-    *dst = (char*)malloc(len + 1); // Allocate for caller
-    (*dst)[0] = '\0';  // Fixed: was *dst[0] = '\0' which is incorrect
+    *dst = (char*)malloc(len + 1);
+    (*dst)[0] = '\0';
     int idx = 0;
     int length;
     if (*dst != NULL) {
@@ -87,7 +85,7 @@ int get_log(server_log log, char** dst) {
         while (current != NULL) {
             length = (int)strlen(current->logData);
             if (!isFirst) {
-                (*dst)[idx] = '\n';  // Add newline before each entry except the first
+                (*dst)[idx] = '\n';  //add newline before each entry except the first
                 idx++;
             }
             for (int i = 0; i < length; i++) {
@@ -118,10 +116,7 @@ void add_to_log(server_log log, const char* data, int data_len) {
     log->writersWaiting--;
     log->writersInside++;
 
-    // Keep the sleep inside the critical section for proper synchronization
-    usleep(200000);
-
-    // Create and add the log entry while still in critical section
+    //create and add the log entry while still in critical section
     LogDataNode* newData = (LogDataNode*)malloc(sizeof(LogDataNode));
     newData->logData = (char*)malloc(data_len + 1);
     for (int i = 0; i < data_len; i++) {

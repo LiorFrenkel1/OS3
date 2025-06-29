@@ -133,15 +133,17 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
     offset += sprintf(buf + offset, "Server: OS-HW3 Web Server\r\n");
     offset = append_stats(buf, t_stats, arrival, dispatch);
 
-    Rio_writen(fd, buf, offset);
+    Rio_writen(fd, buf, offset); //shouldve done -2 to include length and type in header, but its segel code, so leave it like that as no piazza answer
 
-    int pid = Fork();
-    if (pid == 0) {
+    int pid = 0;
+    if ((pid = Fork()) == 0) {
+        /* Child process */
         Setenv("QUERY_STRING", cgiargs, 1);
+        /* When the CGI process writes to stdout, it will instead go to the socket */
         Dup2(fd, STDOUT_FILENO);
         Execve(filename, emptylist, environ);
     }
-    WaitPid(pid, NULL, 0);
+    WaitPid(pid, NULL, WUNTRACED);
 }
 
 
@@ -158,7 +160,6 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
 
     srcfd = Open(filename, O_RDONLY, 0);
 
-    // memory-map the file
     srcp = Mmap(0, filesize, PROT_READ, MAP_PRIVATE, srcfd, 0);
     Close(srcfd);
 
@@ -168,7 +169,7 @@ void requestServeStatic(int fd, char *filename, int filesize, struct timeval arr
     offset += sprintf(buf + offset, "Server: OS-HW3 Web Server\r\n");
     offset += sprintf(buf + offset, "Content-Length: %d\r\n", filesize);
     offset += sprintf(buf + offset, "Content-Type: %s\r\n", filetype);
-    offset = append_stats(buf, t_stats, arrival, dispatch);  // continues writing at the end
+    offset = append_stats(buf, t_stats, arrival, dispatch);
 
     Rio_writen(fd, buf, offset);
     Rio_writen(fd, srcp, filesize);
