@@ -79,14 +79,21 @@ int get_log(server_log log, char** dst) {
 
     *dst = (char*)malloc(len + 1); // Allocate for caller
     (*dst)[0] = '\0';  // Fixed: was *dst[0] = '\0' which is incorrect
+    int idx = 0;
+    int length;
     if (*dst != NULL) {
         current = log->head;
         int isFirst = 1;
         while (current != NULL) {
+            length = (int)strlen(current->logData);
             if (!isFirst) {
-                strcat(*dst, "\n");  // Add newline before each entry except the first
+                (*dst)[idx] = '\n';  // Add newline before each entry except the first
+                idx++;
             }
-            strcat(*dst, current->logData);
+            for (int i = 0; i < length; i++) {
+                (*dst)[idx] = current->logData[i];
+                idx++;
+            }
             current = current->next;
             isFirst = 0;
         }
