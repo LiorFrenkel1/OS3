@@ -37,6 +37,9 @@ void enqueue(Queue* q, void* data) {
     pthread_mutex_lock(&m);
 
     Node* new_node = malloc(sizeof(Node));
+    if (new_node == NULL) {
+        unix_error("Malloc failed");
+    }
     new_node->data = data;
     new_node->next = NULL;
 
@@ -61,6 +64,9 @@ void* dequeue(Queue* q) {
     pthread_mutex_lock(&m);
 
     Node* temp = q->front;
+    if (temp == NULL) {
+        app_error("Impossible to remove an element from an empty queue");
+    }
     void* data = temp->data;
 
     requestEntry* reqEnt = (requestEntry*)data;

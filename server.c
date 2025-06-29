@@ -46,6 +46,9 @@ void* handle_requests(void* arg) {
     server_log log = args->log;
     int id = args->id;
     threads_stats t = malloc(sizeof(struct Threads_stats));
+    if (t == NULL) {
+        unix_error("Malloc failed");
+    }
     t->id = id;             // Thread ID (placeholder)
     t->stat_req = 0;       // Static request count
     t->dynm_req = 0;       // Dynamic request count
@@ -74,6 +77,9 @@ void* handle_requests(void* arg) {
 void initialize_workers_threads(pthread_t* arr,server_log log, int num_threads) {
     for (int i = 0; i < num_threads; i++) {
         WorkerArgs* args = malloc(sizeof(WorkerArgs));
+        if (args == NULL) {
+            unix_error("Malloc failed");
+        }
         args->log = log;
         args->id = i+1;
         pthread_create(&arr[i],NULL, handle_requests, args);
@@ -108,6 +114,9 @@ int main(int argc, char *argv[])
         connfd = Accept(listenfd, (SA *)&clientaddr, (socklen_t *) &clientlen);
 
         requestEntry* reqEnt = malloc(sizeof(requestEntry ));
+        if (reqEnt == NULL) {
+            unix_error("Malloc failed");
+        }
         reqEnt->connfd = connfd;
 
         enqueue(&requests_queue, reqEnt); //will wait here if queue is full
