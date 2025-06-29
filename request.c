@@ -133,7 +133,7 @@ void requestServeDynamic(int fd, char *filename, char *cgiargs, struct timeval a
     offset += sprintf(buf + offset, "Server: OS-HW3 Web Server\r\n");
     offset = append_stats(buf, t_stats, arrival, dispatch);
 
-    Rio_writen(fd, buf, offset); //shouldve done -2 to include length and type in header, but its segel code, so leave it like that as no piazza answer
+    Rio_writen(fd, buf, offset);
 
     int pid = 0;
     if ((pid = Fork()) == 0) {
