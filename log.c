@@ -2,6 +2,7 @@
 #include <string.h>
 #include <pthread.h>
 #include "log.h"
+#include "segel.h"
 
 typedef struct LogDataNode {
     char* logData;
@@ -23,6 +24,9 @@ struct Server_Log {
 // Creates a new server log instance (stub)
 server_log create_log() {
     server_log serverLog = (server_log)malloc(sizeof(struct Server_Log));
+    if (serverLog == NULL) {
+        unix_error("Malloc failed");
+    }
     serverLog->head = NULL;
     serverLog->tail = NULL;
     serverLog->readersInside = 0;
@@ -76,6 +80,9 @@ int get_log(server_log log, char** dst) {
     }
 
     *dst = (char*)malloc(len + 1);
+    if (*dst == NULL) {
+        unix_error("Malloc failed");
+    }
     (*dst)[0] = '\0';
     int idx = 0;
     int length;
@@ -118,7 +125,13 @@ void add_to_log(server_log log, const char* data, int data_len) {
 
     //create and add the log entry while still in critical section
     LogDataNode* newData = (LogDataNode*)malloc(sizeof(LogDataNode));
+    if (newData == NULL) {
+        unix_error("Malloc failed");
+    }
     newData->logData = (char*)malloc(data_len + 1);
+    if (newData->logData == NULL) {
+        unix_error("Malloc failed");
+    }
     for (int i = 0; i < data_len; i++) {
         newData->logData[i] = data[i];
     }
